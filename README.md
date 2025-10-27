@@ -53,7 +53,7 @@ Ensure you have GNU compilers installed on your system.
 
 For Ubuntu/Debian systems:
 ```shell
-    sudo apt install gcc g++ gfortran
+sudo apt install gcc g++ gfortran
 ```
 Clone this repository to your local machine:
 ```shell
