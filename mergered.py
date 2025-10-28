@@ -175,7 +175,7 @@ def fit(*args,**kwargs):
     GeV_Frequency = [1e24]
     TeV_Frequency = [1e27]
     
-    Frequencies = np.concatenate((XRT, opt, radio,GeV_Frequency,TeV_Frequency), axis=0)
+    Frequencies = np.concatenate((XRT, opt, radio, GeV_Frequency, TeV_Frequency), axis=0)
     Num_nu_obs = len(Frequencies)
 
     # parameters of afterglow
