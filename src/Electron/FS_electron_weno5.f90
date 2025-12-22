@@ -582,8 +582,7 @@ subroutine fs_electron_weno5(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,Num
                 end do
               end if
            end do
-    
-    ! 更新内部点（不包括ghost cells）
+           
            dN_x = dN_x_extended(1:Num_gam_e)
            dN_x = dN_x + dF1*dDR
             
@@ -608,7 +607,7 @@ subroutine update_ghost_cells(arr, n)
         arr(1-2:0) = arr(1)
         arr(n+1:n+3) = arr(n)
         
-        ! 可选：周期性边界条件
+        ! Periodic boundary conditions, not used.
         ! arr(1-2) = arr(n-1)
         ! arr(1-1) = arr(n)
         ! arr(n+1) = arr(1)
