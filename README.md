@@ -38,7 +38,10 @@ If you use, adapt, or reference the core algorithms from this project in other s
 }
 
 ```
+<<<<<<< HEAD
 
+=======
+>>>>>>> f5aa667 (Update README.md)
 This project name is **ASGARD**, Retrieved from
 <https://github.com/mikuru1096/ASGARD_GRBAfterglow>
 
@@ -66,11 +69,10 @@ python hand_my.py
 
 If you already have the matplotlib package installed, the program should generate the first multi-band afterglow light curve image for you.
 ### Documentation
-In mergered.py, we have provided the basic invocation method of the program, along with simple comments for the keywords.
+In `mergered.py`, we have provided the basic invocation method of the program, along with simple comments for the keywords.
 ### Current Status
 Due to current progress limitations, we are not yet able to provide a complete demonstration of the afterglow fitting workflow. 
 However, please start exploring and try to integrate it into your own fitting framework!
 ### Web Interface
-We have a website available at
-<https://hetools.xyz>  
+We have a website available at <https://hetools.xyz>  
 that requires no installation, for comparing the results of **ASGARD** and **jetsimpy**. Feel free to give it a try!
