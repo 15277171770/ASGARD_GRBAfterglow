@@ -48,7 +48,7 @@ Ensure you have `GNU` compilers, `python <= 3.11`, `numpy`, `astropy`, `scipy`, 
 
 For Ubuntu/Debian systems:
 ```shell
-sudo apt install gcc g++ gfortran
+    sudo apt install gcc g++ gfortran
 ```
 Clone this repository to your local machine:
 ```shell
