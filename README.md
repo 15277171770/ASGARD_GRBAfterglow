@@ -12,7 +12,7 @@ The code's greatest strengths lie in its exceptional computational efficiency an
 1. The interface for energy injection has been opened, supporting energy injection in the form of black hole accretion. 
 2. Added density jump behavior in a uniform environment, enabling the modeling of a dense shell (e.g., a gas cloud) or a cavity at a distance R from the progenitor star radius, with a density profile following a log-Gaussian distribution. 
 3. Added output for the characteristic synchrotron radiation frequencies: $\nu_m$, $\nu_c$, and $\nu_a$.
-4. Modify the compilation flow and remove the limitation on the Python version.
+4. Now we use the `meson`-based `f2py` compilation process, which significantly accelerates the build. Moreover, this improvement allows us to lift the previous restrictions on Python versions—only require `Python >= 3.8` as a baseline.
 ## License
 **Copyright (c) 2025 Jia Ren**  
 
