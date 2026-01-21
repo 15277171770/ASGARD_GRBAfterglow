@@ -1,6 +1,5 @@
 !Calculate the electron distibutions of forward shock.
 !New improvement at 11.29.2022
-include 'calling_modules.f90'
 !****************************************************************************************
 !******************************* main program *******************************************
 !****************************************************************************************
@@ -24,6 +23,7 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
     
     !***********************[Parameter Initial]**********************
     Eta_0=Boundary(1)
+    R_ini=Boundary(4)
     Epsilon_e=Boundary(5)
     Epsilon_b=Boundary(6)
     p=Boundary(7)

@@ -12,7 +12,7 @@ The code's greatest strengths lie in its exceptional computational efficiency an
 1. The interface for energy injection has been opened, supporting energy injection in the form of black hole accretion. 
 2. Added density jump behavior in a uniform environment, enabling the modeling of a dense shell (e.g., a gas cloud) or a cavity at a distance R from the progenitor star radius, with a density profile following a log-Gaussian distribution. 
 3. Added output for the characteristic synchrotron radiation frequencies: $\nu_m$, $\nu_c$, and $\nu_a$.
-
+4. Modify the compilation flow and remove the limitation on the Python version.
 ## License
 **Copyright (c) 2025 Jia Ren**  
 
@@ -49,16 +49,20 @@ This project name is **ASGARD**, Retrieved from
 
 ### Quick Start
 The usage of this code is very simple.
-Ensure you have `GNU` compilers, `python <= 3.11`, `numpy`, `astropy`, `scipy`, and `matplotlib` installed on your system.
-
+Ensure you have `GNU` compilers, `python >=3.8`, `numpy`, `astropy`, `scipy`, and `matplotlib` installed on your system.
 For Ubuntu/Debian systems:
 ```shell
 sudo apt install gcc g++ gfortran
 ```
+
 Clone this repository to your local machine:
 ```shell
 git clone https://github.com/mikuru1096/ASGARD_GRBAfterglow
 cd ASGARD_GRBAfterglow
+```
+Install dependencies
+```shell
+pip install -r Requirements.txt
 ```
 Run the installation script:
 ```shell

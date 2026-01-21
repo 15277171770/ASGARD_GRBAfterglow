@@ -370,7 +370,7 @@ SUBROUTINE GRKT4(dB3,T_cross,R_cross,e3_cross,gam20, T,H,Y,para_m_ej,Delta_0,eta
             T=T+DT
         end do
         P=0.0
-        do I=1,M
+        do I=1,4
             Q=2.0*abs(Y(I)-G(I))/(Y(I)+G(I))
             if (Q > P) P=Q
         end do

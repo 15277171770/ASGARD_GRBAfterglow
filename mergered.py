@@ -251,7 +251,8 @@ def fit(*args,**kwargs):
     GeV_fluxes = Fluxes[Num_XRT+7, :] * GeV_Frequency
     TeV_fluxes = Fluxes[Num_XRT+8, :] * TeV_Frequency
     
-    plot_syn_lc(Tobs, *opt_fluxes, *radio_fluxes, Flux_XRT, GeV_fluxes, TeV_fluxes)
+    if plot_LC:
+        plot_syn_lc(Tobs, *opt_fluxes, *radio_fluxes, Flux_XRT, GeV_fluxes, TeV_fluxes)
 
     gc.collect()
     

@@ -1,0 +1,14 @@
+numpy
+matplotlib
+pymultinest
+corner
+emcee
+multiprocessing
+schwimmbad
+astropy
+extinction
+scipy
+h5py
+tqdm
+meson
+ninja

@@ -1,27 +1,37 @@
-#!bin/bash
+#!/bin/bash
+
+F2PY_CMD="python3 -m numpy.f2py"
+
+F90FLAGS_COMMON="-Ofast -march=native -funroll-loops -ffast-math -fno-signed-zeros -fno-trapping-math"
+F90FLAGS_OMP="-fopenmp $F90FLAGS_COMMON -flto"
+LIBS="-lgomp"
+echo "Compile start"
+
 cd ./src
-rm *.so *.mod *.o
-gfortran -c Constants.f90
-f2py -m Constants -c Constants.f90
-#wait
+rm -f *.so *.mod *.o
+
+$F2PY_CMD -m Constants -c Constants.f90 --quiet
+
 cd ./Dynamics
-f2py -m Dynamics_reverse -c Dynamics_reverse.f90 -I../ --f90flags='-Ofast -march=native -funroll-loops -ffast-math -fno-signed-zeros -fno-trapping-math'
-f2py -m Dynamics_forward -c Dynamics_forward.f90 -I../ --f90flags='-Ofast -march=native -funroll-loops -ffast-math -fno-signed-zeros -fno-trapping-math'
-#wait
+rm -f *.so *.mod *.o
+FFLAGS="$F90FLAGS_COMMON" $F2PY_CMD -m Dynamics_reverse -c ../Constants.f90 Dynamics_reverse.f90 --quiet
+FFLAGS="$F90FLAGS_COMMON" $F2PY_CMD -m Dynamics_forward -c ../Constants.f90 Dynamics_forward.f90 --quiet
+
 cd ../Electron
-f2py -m FS_electron_weno5 -c FS_electron_weno5.f90 -I../ --f90flags='-Ofast -march=native -funroll-loops -ffast-math -fno-signed-zeros -fno-trapping-math'
-f2py -m FS_electron_fullhide -lgomp -c FS_electron_fullhide.f90 -I../ --f90flags='-fopenmp -Ofast -march=native -funroll-loops -ffast-math -fno-signed-zeros -fno-trapping-math'
-#wait
+rm -f *.so *.mod *.o
+FFLAGS="$F90FLAGS_OMP" $F2PY_CMD -m FS_electron_weno5 -c ../Constants.f90 FS_electron_weno5.f90 $LIBS --quiet
+FFLAGS="$F90FLAGS_OMP" $F2PY_CMD -m FS_electron_fullhide -c ../Constants.f90 calling_modules.f90 FS_electron_fullhide.f90 $LIBS --quiet
+
 cd ../Interpolation
-rm *.so
-f2py -m SED_interpolation -lgomp -c SED_interpolation.f90  -I../ --f90flags='-fopenmp -Ofast -march=native -funroll-loops -ffast-math -fno-signed-zeros -fno-trapping-math'
-f2py -m SED_interpolation_structured -lgomp -c SED_interpolation_structured.f90  -I../ --f90flags='-fopenmp -Ofast -march=native -funroll-loops -ffast-math -fno-signed-zeros -fno-trapping-math'
-#wait
+rm -f *.so *.mod *.o
+FFLAGS="$F90FLAGS_OMP" $F2PY_CMD -m SED_interpolation -c ../Constants.f90 SED_interpolation.f90 $LIBS --quiet
+FFLAGS="$F90FLAGS_OMP" $F2PY_CMD -m SED_interpolation_structured -c ../Constants.f90 SED_interpolation_structured.f90 $LIBS --quiet
+
 cd ../Radiation
-rm *.so
-f2py -m Annihilation -lgomp -c Annihilation.f90 -I../ --f90flags='-fopenmp -Ofast -march=native -funroll-loops -ffast-math -fno-signed-zeros -fno-trapping-math'
-f2py -m Seed_reverse -lgomp -c Seed_reverse.f90 -I../ --f90flags='-fopenmp -Ofast -march=native -funroll-loops -ffast-math -fno-signed-zeros -fno-trapping-math'
-f2py -m SSC_spec -lgomp -c SSC_spec.f90 -I../ --f90flags='-fopenmp -Ofast -march=native -funroll-loops -ffast-math -fno-signed-zeros -fno-trapping-math'
-cd ..
-cd ..
+rm -f *.so *.mod *.o
+FFLAGS="$F90FLAGS_OMP" $F2PY_CMD -m Annihilation -c ../Constants.f90 Annihilation.f90 $LIBS --quiet
+FFLAGS="$F90FLAGS_OMP" $F2PY_CMD -m Seed_reverse -c ../Constants.f90 Seed_reverse.f90 $LIBS --quiet
+FFLAGS="$F90FLAGS_OMP" $F2PY_CMD -m SSC_spec -c ../Constants.f90 SSC_spec.f90 $LIBS --quiet
+
+cd ../..
 echo "Compile complete!"
