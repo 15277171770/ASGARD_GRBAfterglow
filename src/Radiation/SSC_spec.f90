@@ -7,13 +7,12 @@ subroutine ssc_spec(R,gam_e,dN_gam_e,V_seed,seed,Num_nu,Num_R,Num_gam_e,n_thread
     real(8), intent(in) :: R(Num_R),gam_e(Num_gam_e)
     real(8), intent(in) :: dN_gam_e(Num_gam_e,Num_R),V_seed(Num_nu),seed(Num_nu,Num_R)
     real(8), intent(out) :: P_SSC_spec(Num_nu,Num_R),seed_SSC(Num_nu,Num_R)
-
+        
     allocatable :: simpson_weights(:), V_weights(:)
 
     allocate (simpson_weights(Num_gam_e), V_weights(Num_nu))
-
-    P_SSC_spec=zero
-    seed_SSC=zero
+    
+!    call system_clock(int1)
     
     para_hEme = Para_h/para_m_energy
 
@@ -27,7 +26,9 @@ subroutine ssc_spec(R,gam_e,dN_gam_e,V_seed,seed,Num_nu,Num_R,Num_gam_e,n_thread
     seed_SSC=zero
     
     !$ call omp_set_dynamic(.true.)
-    !$OMP PARALLEL num_threads(n_threads)
+    !$OMP PARALLEL num_threads(n_threads), private(I_R, I_nu, Nu_s, i_game, i, II, Vloc, &
+    !$OMP& Ephoton2eV, dInteg, simpson_sum_nu, gam_val, val1, val2, val3, weight, emission_int2, &
+    !$OMP& simpson_sum_gam, P_v, F1)
     !$OMP DO SIMD
     do I_R=1,Num_R
         do I_nu=1,Num_nu
@@ -56,31 +57,31 @@ subroutine ssc_spec(R,gam_e,dN_gam_e,V_seed,seed,Num_nu,Num_R,Num_gam_e,n_thread
                      else
                         fssc = zero
                      end if
-                     val = dN_gam_e(i_game, I_R) * fssc / gam_val
+                     val1 = dN_gam_e(i_game,I_R)*fssc/gam_val
                      weight = simpson_weights(i_game)
-                     simpson_sum_gam = simpson_sum_gam + val * weight
+                     simpson_sum_gam = simpson_sum_gam + val1 * weight
                   end do
                   emission_int2 = (h_gam/3.0d0) * simpson_sum_gam
                else
-                  emission_int2 = 0.0d0
-                  simpson_sum_gam = 0.0d0
-                  do i_game = II,Num_gam_e-1
+                  emission_int2 = zero
+                  simpson_sum_gam = zero
+                  do i_game = II,Num_gam_e
                      gam_val = gam_e(i_game)
                      temp = gam_val - Ephoton2eV
-                     if (temp <= 0) cycle
+                     if (temp <= zero) cycle
                      q = Vloc / (4.0d0 * gam_val * V_seed(Nu_s) * temp)
                      if (q >= one) cycle
                      q_gamma = Ephoton2eV / temp
                      fssc = two*q*(log(q)-q)+one+q+q_gamma*q_gamma/(two*(one+q_gamma))*(one-q)
-                     val = dN_gam_e(i_game, I_R) * fssc / gam_val
+                     val2 = dN_gam_e(i_game, I_R) * fssc / gam_val
                      weight = simpson_weights(i_game)
-                     simpson_sum_gam = simpson_sum_gam + val * weight
+                     simpson_sum_gam = simpson_sum_gam + val2 * weight
                   end do
                   emission_int2 = (h_gam/3.0d0) * simpson_sum_gam
                end if
-               val = seed(Nu_s, I_R) * emission_int2
+               val3 = seed(Nu_s, I_R) * emission_int2
                weight = V_weights(Nu_s)
-               simpson_sum_nu = simpson_sum_nu + val * weight
+               simpson_sum_nu = simpson_sum_nu + val3 * weight
             end do
             dInteg = (h_nu/3.0d0) * simpson_sum_nu
             
@@ -98,6 +99,9 @@ subroutine ssc_spec(R,gam_e,dN_gam_e,V_seed,seed,Num_nu,Num_R,Num_gam_e,n_thread
     
     Temp_para2=4.0d0*pi*Para_c*Para_h
     seed_SSC=seed_SSC/Temp_para2*Temp_para
+    
+!    call system_clock(int2)
+!    print*, 'time=', (int2-int1)/1000.0
     
     deallocate(simpson_weights, V_weights)
 
@@ -121,5 +125,5 @@ contains
             end do
         endif
     end subroutine compute_simpson_weights
-
+    
 end subroutine ssc_spec

@@ -1,3 +1,4 @@
+include 'Constants.f90'
 subroutine dynamics_forward(Boundary,n,Num_R,index_dyn, R_Tobs,R_Gamma,R)
     !$ use omp_lib
     use constants
@@ -8,6 +9,7 @@ subroutine dynamics_forward(Boundary,n,Num_R,index_dyn, R_Tobs,R_Gamma,R)
 
     real(8),dimension (4) :: Y,D,B,C,G,E
     real(8),dimension (Num_R) :: R_m
+
     !***********************[Parameter Initial]**********************
     Eta_0=Boundary(1)
     Epsilon_e=Boundary(5)
@@ -19,12 +21,19 @@ subroutine dynamics_forward(Boundary,n,Num_R,index_dyn, R_Tobs,R_Gamma,R)
     E_iso=Boundary(14)
     T_log10_duration=Boundary(15)
     f_e=Boundary(16)
+    E_inj_t1=Boundary(17)
+    E_inj_t2=Boundary(18)
+    E_inj=Boundary(19)
+    E_inj_q=Boundary(20)
+    R_tr=Boundary(21)
+    f_jump=Boundary(22)
+    f_wide=Boundary(23)
     R0=Boundary(n)
     
     Num_R1=Num_R-1
-    
     !***********************[Parameter Initial]**********************
     !   Y(1)=Gamma,Y(2)=m,Y(3)=thermal energy,Y(4)=R
+
     Y(1)=Eta_0-0.001
     Y(2)=Boundary(2)
     Y(3)=Boundary(3)
@@ -46,21 +55,18 @@ subroutine dynamics_forward(Boundary,n,Num_R,index_dyn, R_Tobs,R_Gamma,R)
     T_log10=T_log10_duration-Grid_Tobs_bin
     !   log time bin
     do I_tobs=1,Num_R
-        T=ten**(Grid_Tobs_bin+T_log10*(I_tobs-one)/Num_R1)
+        T=0.0*T00+ten**(Grid_Tobs_bin+T_log10*(I_tobs-one)/Num_R1)
         if (I_tobs < one) then
             H=ten**(Grid_Tobs_bin+T_log10*(I_tobs-one)/Num_R1)
         else
             H=ten**(Grid_Tobs_bin+T_log10*I_tobs/Num_R1)-ten**(Grid_Tobs_bin+T_log10*(I_tobs-one)/Num_R1)
         end if
 
-        call GRKT4(T,H,Y,M,EPS,D,B,C,G,E,Epsilon_e,E_iso,Eta_0,dNe_ISM,A_star,Epsilon_b,p,z,f_e,R0,index_dyn)
+        call GRKT4(T,H,Y,M,EPS,D,B,C,G,E,Epsilon_e,E_iso,Eta_0,dNe_ISM,A_star,Epsilon_b,p,z,f_e,&
+        E_inj_t1,E_inj_t2,E_inj,E_inj_q,R_tr,f_jump,f_wide,R0,index_dyn)
         R_Tobs(I_tobs)=T*(one+z)
         R_Gamma(I_tobs)=Y(1)
-        if (index_dyn == 3) then
-            R_m(I_tobs)=Y(2)/Para_m_p
-        else
-            R_m(I_tobs)=Y(2)
-        end if
+        R_m(I_tobs)=Y(2)/Para_m_p
         R(I_tobs)=Y(4)
     end do
 
@@ -68,7 +74,8 @@ subroutine dynamics_forward(Boundary,n,Num_R,index_dyn, R_Tobs,R_Gamma,R)
 end subroutine dynamics_forward
 
 !**********************[Dynamic]**********************
-SUBROUTINE F(T, Y, M, D, E_e, E_iso, Eta_0, dNe_ISM, A_star, E_b, p, z, f_e, R0,index_dyn)
+SUBROUTINE F(T, Y, M, D, E_e, E_iso, Eta_0, dNe_ISM, A_star, E_b, p, z, f_e, &
+             E_inj_t1, E_inj_t2, E_inj, E_inj_q, R_tr, f_jump, f_wide, R0, index_dyn)
     use constants
     IMPLICIT REAL(8)(A-H,O-Z)
     DIMENSION Y(M),D(M)
@@ -81,29 +88,29 @@ SUBROUTINE F(T, Y, M, D, E_e, E_iso, Eta_0, dNe_ISM, A_star, E_b, p, z, f_e, R0,
             dNe=dNe_wind
         end if
     else
-        dNe=dNe_ISM
+    !    dNe=dNe_ISM
+        dNe=dNe_ISM*(1.0+(f_jump-1d0)*exp(-(log10(Y(4))-log10(R_tr))**2/(2*f_wide*f_wide)))
     end if
     
     if (Y(4)<R0) then
         dNe=A_star*3.0d35/R0**2
     end if
-
-    Epe=E_e
-    qq=-0.2
-    t_1=5000.0/(one+z)
-    t_2=9000.0/(one+z)
+    
+    t_1=E_inj_t1/(one+z)
+    t_2=E_inj_t2/(one+z)
     if (T >= t_1 .and. T<= t_2) then
-        A=zero
+        A=E_inj
     else
         A=zero
     end if
-!    A=zero
+    
+    Epe=E_e
     dB=0.39d0*dsqrt((E_b*dNe)*(Y(1)**2-one))
     gam_c=7.739d8/(dB**2*Y(1)*T)
     gam_m=Epe/f_e*1836d0*(p-two)*(Y(1)-one)/(p-one)+one
     if ((gam_c-gam_m) > 0.001) Epe=Epe*(gam_m/gam_c)**(p-two)
     Bgam=dsqrt(one-one/Y(1)**2)
-    
+
     select case(index_dyn)
     
     case(1)
@@ -113,7 +120,7 @@ SUBROUTINE F(T, Y, M, D, E_e, E_iso, Eta_0, dNe_ISM, A_star, E_b, p, z, f_e, R0,
     D01=Y(1)**2-one
     D02=DNe0+Epe*Y(2)+2.0*(one-Epe)*Y(1)*Y(2)
     dM=dNe*Y(4)**2*D00
-    D(1)=(-D01*dM+A/(4d0*pi)*(one+T/T_1)**qq/1.5*1.0D3)/D02
+    D(1)=(-D01*dM+A/(4d0*pi)*(one+T/t_1)**E_inj_q/1.5*1.0D3)/D02
     D(2)=dM
     D(3)=(Y(1)-one)*dM
     D(4)=D00
@@ -153,21 +160,21 @@ SUBROUTINE F(T, Y, M, D, E_e, E_iso, Eta_0, dNe_ISM, A_star, E_b, p, z, f_e, R0,
     D01=Y(1)**2-one
     dM=4d0*pi*dNe*Y(4)**2*D00*Para_m_p
     D011=-dM/D00*Para_c**2*Y(1)*D01*(hat_gam*Y(1)-hat_gam+one)- &
-            (hat_gam*D01+one)*Y(1)*(one-hat_gam)*3d0*Y(3)/Y(4)+Y(1)**2*A*(T/t_1)**qq/D00
+            (hat_gam*D01+one)*Y(1)*(one-hat_gam)*3d0*Y(3)/Y(4)+Y(1)**2*A*T**E_inj_q/D00
     D022=Y(1)**2*(DNe0+Y(2))*Para_c**2+(hat_gam**2*D01+3d0*hat_gam-two)*Y(3)
 
     D(1)=D011/D022*D00
     D(2)=dM
     D(3)=((1d0-Epe)*(Y(1)-one)*dM/D00*Para_c**2-                &
-            (hat_gam-one)*(3d0/Y(4)-one/Y(1)*D(1)/D00)*Y(3))*D00+A*(T/t_1)**qq/D00
+            (hat_gam-one)*(3d0/Y(4)-one/Y(1)*D(1)/D00)*Y(3))*D00+A*T**E_inj_q/D00
     D(4)=D00
-    
     end select
     
     return
 end subroutine F
 
-SUBROUTINE GRKT4(T,H,Y,M,EPS,D,B,C,G,E,Epsilon_e,E_iso,Eta_0,dNe_ISM,A_star,Eb,pp,z0,f_e,R0,index_dyn)
+SUBROUTINE GRKT4(T,H,Y,M,EPS,D,B,C,G,E,Epsilon_e,E_iso,Eta_0,dNe_ISM,A_star,Eb,pp,z0,f_e,&
+E_inj_t1,E_inj_t2,E_inj,E_inj_q,R_tr,f_jump,f_wide,R0,index_dyn)
     IMPLICIT REAL(8)(A-H,O-Z)
     DIMENSION Y(M),D(M),A(4),B(M),C(M),G(M),E(M)
 
@@ -186,14 +193,16 @@ SUBROUTINE GRKT4(T,H,Y,M,EPS,D,B,C,G,E,Epsilon_e,E_iso,Eta_0,dNe_ISM,A_star,Eb,p
         DT=H/N
         T=X
         do J=1,N
-            call F(T,Y,M,D,Epsilon_e,E_iso,Eta_0,dNe_ISM,A_star,Eb,pp,z0,f_e,R0,index_dyn)
+            call F(T,Y,M,D,Epsilon_e,E_iso,Eta_0,dNe_ISM,A_star,Eb,pp,z0,f_e,&
+            E_inj_t1,E_inj_t2,E_inj,E_inj_q,R_tr,f_jump,f_wide,R0,index_dyn)
             E=Y
             B=Y
             do K=1,3
                 Y=E+A(K)*D
                 B=B+A(K+1)*D/3.0
                 TT=T+A(K)
-                call F(TT,Y,M,D,Epsilon_e,E_iso,Eta_0,dNe_ISM,A_star,Eb,pp,z0,f_e,R0,index_dyn)
+                call F(TT,Y,M,D,Epsilon_e,E_iso,Eta_0,dNe_ISM,A_star,Eb,pp,z0,f_e,&
+                E_inj_t1,E_inj_t2,E_inj,E_inj_q,R_tr,f_jump,f_wide,R0,index_dyn)
             end do
             Y=B+HH*D/6.0
             T=T+DT

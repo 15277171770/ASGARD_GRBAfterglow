@@ -5,14 +5,15 @@ include 'calling_modules.f90'
 !******************************* main program *******************************************
 !****************************************************************************************
 subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,Num_gam_e,index_Y,index_syn_intger,n_threads, &
-                                gam_e,dN_gam_e,P_syn,Seed_syn)
+                                gam_e,dN_gam_e,P_syn,Seed_syn,V_m,V_c,V_a)
     !$ use omp_lib
     use constants
     use get_Y
     IMPLICIT REAL(8)(A-H,O-Z)
     integer, intent(in) :: n,Num_nu,Num_R,Num_gam_e,index_Y,index_syn_intger
     real(8), intent(in) :: Boundary(n),R_Tobs(Num_R),R_Gamma(Num_R),R(Num_R),V_seed(Num_nu)
-    real(8), intent(out) :: dN_gam_e(Num_gam_e,Num_R),gam_e(Num_gam_e),P_syn(Num_nu,Num_R),Seed_syn(Num_nu,Num_R)
+    real(8), intent(out) :: dN_gam_e(Num_gam_e,Num_R),gam_e(Num_gam_e),P_syn(Num_nu,Num_R), &
+                            Seed_syn(Num_nu,Num_R), V_m(Num_R), V_c(Num_R), V_a(Num_R)
     
     real(8),allocatable,dimension (:) :: dEl,dEL_mean,principal,x,dF1,up,para_minus_gam_e_p,dot_gam_e_SSA, &
                                          dN_x,temp1,temp2,temp3,temp4,para_maxwell,Compton,Compton1,dot_gam_e
@@ -30,12 +31,19 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
     dNe_ISM=Boundary(11)
     A_star=Boundary(12)
     E_iso=Boundary(14)
+    T_log10_duration=Boundary(15)
     f_e=Boundary(16)
+    R_tr=Boundary(21)
+    f_jump=Boundary(22)
+    f_wide=Boundary(23)
     R0=Boundary(n)
     
     P_syn=zero
     Seed_syn=zero
-    
+    V_m=zero
+    V_c=zero
+    V_a=zero
+
     !*****************Part 1: given the boundary consition [Using the analytical approximation]*********************
     if (A_star > zero) then
         dNe_wind=A_star*3.0d35/R(1)**2
@@ -98,7 +106,7 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
     d_x=dlog10(gam_e(2)/gam_e(1))
 !    factor_adv=Para_sigmaT/(6.0d0*pi*Para_m_energy)
     para_minus_gam_e_p=one/(gam_e-one)**p*gam_e*dlog(ten)
-    
+
     do I_tobs=2,Num_R
         R_loc=R(I_tobs-1)
         R_Gamma_loc=(R_Gamma(I_tobs)+R_Gamma(I_tobs-1))/two
@@ -128,7 +136,7 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
         Gam_e_m_p=(p-one)*(Gam_e_m-one)**(p-one)
         Gam_e_c=7.7d8*(one+z)/R_Gamma_loc/DB**2/R_Tobs(I_tobs)
 
-        beta_Gam=dsqrt(one-one/R_Gamma_loc**2)
+        beta_Gam=sqrt(one-one/R_Gamma_loc**2)
         f_r=(1.35d-19)/beta_Gam/R_Gamma_loc*DB**2/pi
         dDR=0.1/(f_r*Gam_e_max+1.333/(R(I_tobs)+R(I_tobs-1)))
         !***********************[Here we have presented the choice on Delta_r]******************************************
@@ -138,6 +146,11 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
         CFL=dDR/d_x
         dN_x=dN_gam_e(:,I_tobs-1)*gam_e*dlog(ten)
         
+        V_m(I_tobs-1)=4.2d6*DB*Gam_e_m*Gam_e_m/(R_Gamma_loc*(1d0-beta_Gam)*(one+z))
+        V_c(I_tobs-1)=4.2d6*DB*Gam_e_c*Gam_e_c/(R_Gamma_loc*(1d0-beta_Gam)*(one+z))
+        call get_nu_a(R_loc,DB,Num_gam_e,gam_e,dN_gam_e(:,I_tobs-1), temp)
+        V_a(I_tobs-1)=temp/(R_Gamma_loc*(1d0-beta_Gam)*(one+z))
+
         !Compton_max=one+(-one+dsqrt(one+4d0*eta*Epsilon_e/Epsilon_b))/two
         !Gam_e_max=Gam_e_max!/sqrt(Compton_max)
 !        Compton = zero
@@ -201,6 +214,23 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
 
         do L=1,L1
             R_loc=R_loc+dDR
+            
+            if (A_star > zero) then
+                dNe_wind=A_star*3.0d35/R_loc**2
+                if (dNe_wind <= dNe_ISM/4d0) then
+                    dNe=dNe_ISM
+                else
+                    dNe=dNe_wind
+                end if
+            else
+            !    dNe=dNe_ISM
+                dNe=dNe_ISM*(1.0+(f_jump-1d0)*exp(-(log10(R_loc)-log10(R_tr))**2/(2*f_wide*f_wide)))
+            end if
+        
+            if (R_loc<R0) then
+                dNe=A_star*3.0d35/R0**2
+            end if
+            
             Q=4d0/3d0*pi*(3d0*R_loc**2+dDR*(3d0*R_loc+dDR))*dNe*f_e*Gam_e_m_p  !here Q is Q_0*\gamma_m**p
             dF1=zero
             where(gam_e<Gam_e_max .and. gam_e>Gam_e_m) dF1=Q*para_minus_gam_e_p!*f_e
@@ -229,3 +259,4 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
 
     return
 end subroutine fs_electron_fullhide
+

@@ -38,7 +38,7 @@ params={
         'A_star': A_star,
         'R0': 1e9,
         
-        'Ebv': 2.93,
+        'Ebv': 0,
         'Lyman_Ar': 0,
         'f_sys': -1,
         'theta_v': theta_v,

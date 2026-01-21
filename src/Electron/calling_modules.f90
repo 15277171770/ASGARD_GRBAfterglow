@@ -2,7 +2,7 @@ module get_Y
   use constants
   private
 
-  public :: besselk, get_syn, get_syn_simpson, get_SSA_numerical, get_IC_numerical, get_Y_Nakar, get_Y_Fan
+  public :: besselk, get_syn, get_syn_simpson, get_nu_a, get_SSA_numerical, get_IC_numerical, get_Y_Nakar, get_Y_Fan
 
 contains
 
@@ -146,12 +146,12 @@ allocate (dN1(Num_gam_e),ddN(Num_gam_e-1),d_nu(Num_nu-1))
        dInteg=zero
        Tau=zero
 
-       ! ∫f(x)dx ≈ (h/3)[f(x0) + 4f(x1) + 2f(x2) + 4f(x3) + ... + f(xn)]
-       simpson_sum = 0.0d0
+       ! \int f(x)dx \prox (h/3)[f(x0) + 4f(x1) + 2f(x2) + 4f(x3) + ... + f(xn)]
+       simpson_sum = zero
        do I_gam_e=1,Num_gam_e
            Vc = (4.2d6)*gam_e(I_gam_e)**2*DB
            x = V_cal/Vc
-           Fx = 1.81d0*dexp(-x)/dsqrt(x**(-2d0/3d0)+factor)
+           Fx = 1.81d0*exp(-x)/sqrt(x**(-2d0/3d0)+factor)
            val = dN_gam_e(I_gam_e) * Fx * gam_e(I_gam_e)
                
            if (I_gam_e == 1 .or. I_gam_e == Num_gam_e) then
@@ -168,14 +168,14 @@ allocate (dN1(Num_gam_e),ddN(Num_gam_e-1),d_nu(Num_nu-1))
           gam_e_mean2=(gam_e(I_gam_e)+gam_e(I_gam_e+1))**2/4d0
           Vc=(4.2d6)*gam_e_mean2*DB
           x=V_cal/Vc
-          Fx=1.81d0*dexp(-x)/dsqrt(x**(-2d0/3d0)+factor)
+          Fx=1.81d0*exp(-x)/sqrt(x**(-2d0/3d0)+factor)
           Tau=Tau+gam_e_mean2*ddN(I_gam_e)*Fx
        end do
        ! ===================================================
        P_v=Temp_syn*DB*dInteg
        Tau=1.046d4*Tau*DB/(4d0*pi*Rariv2*V_cal*V_cal)
        if ((Tau-1d-4) < 1d-5) Tau=1d-4
-       P_syn(I_nu)=P_v*(one-dexp(-Tau))/Tau
+       P_syn(I_nu)=P_v*(one-exp(-Tau))/Tau
        Seed_syn(I_nu)=P_syn(I_nu)/(Rariv2*V_cal)
     end do
     !$OMP END DO SIMD
@@ -408,5 +408,56 @@ real(8), intent(out) :: Compton(Num_gam_e)
 
 end subroutine get_Y_Fan
 
+subroutine get_nu_a(R_loc,DB,Num_gam_e,gam_e,dN_gam_e, &
+                       V_a)
+!$ use omp_lib
+implicit REAL(8)(A-H,O-Z)
+integer, intent(in) :: Num_gam_e
+real(8), intent(in) :: R_loc,DB,gam_e(Num_gam_e),dN_gam_e(Num_gam_e)
+real(8), intent(out) :: V_a
+
+real(8),allocatable,dimension (:) :: dN1,ddN,gam_e_mean2
+allocate (dN1(Num_gam_e),ddN(Num_gam_e-1),gam_e_mean2(Num_gam_e-1))
+
+    factor=(3.62d0/pi)**2
+    Rariv2=R_loc*R_loc
+    dN1=dN_gam_e/(gam_e*gam_e)
+    ddN=dN1(1:Num_gam_e-1)-dN1(2:Num_gam_e)
+    gam_e_mean2=(gam_e(1:Num_gam_e-1)+gam_e(2:Num_gam_e))**2/4d0
+    
+    V_a_low=zero
+    do I_nu=1,100
+       V_cal=ten**(4d0+(14d0-4d0)/100*I_nu)
+       Tau=zero
+       do I_gam_e=1,Num_gam_e-1
+          Vc=4.2d6*gam_e_mean2(I_gam_e)*DB !Which is $\nu_c$
+          x=V_cal/Vc !Which is ($\nu/\nu_c$)
+          Fx=1.81d0*exp(-x)/sqrt(x**(-2d0/3d0)+factor) !Approximate function of synchrotron radiation spectrum
+!         Fx=2.149d0*x**(one/3.0d0)*dexp(-x) !!Another approximate function
+          !====================  [SSA]  ======================
+          Tau=Tau+gam_e_mean2(I_gam_e)*ddN(I_gam_e)*Fx
+          !Synchrotron self absorption effect
+          !===================================================
+       end do
+       Tau=1.046d4*Tau*DB/(4d0*pi*Rariv2*V_cal*V_cal) !Synchrotron self absorption effect
+       if (Tau>1d0) then
+          V_a_low=V_cal
+          Tau_high=Tau
+       else
+          V_a=V_cal-(V_cal-V_a_low)*(Tau-1d0)/(Tau-Tau_high)
+          exit
+       end if
+       if (I_nu == 100) then
+           V_a=V_cal
+           print*, 'nu_a_comoving larger than 1e14 Hz!'
+       end if
+    end do
+
+deallocate (dN1,ddN,gam_e_mean2)
+
+return
+end subroutine get_nu_a
+
 end module get_Y
+
 

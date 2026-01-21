@@ -91,11 +91,25 @@ def fit(*args,**kwargs):
     p = kwargs.get('p')  # Spectral index of electrons
     theta_v = kwargs.get('theta_v', 0)  # Viewing angle of observer
     OpeningAngle_jet = kwargs.get('OpeningAngle_jet')  # Openning angle of jet
-    f_e = kwargs.get('f_e',1.0)  # Non-thermal fraction of electrons
+    f_e = kwargs.get('f_e', 1.0)  # Non-thermal fraction of electrons
     dNe = kwargs.get('dNe')  # Uniform ambient medium density
-    A_star = kwargs.get('A_star', -1)  # Steller wind parameter
+    A_star = kwargs.get('A_star', -1)  # Stellar wind parameter
     E_iso = kwargs.get('E_iso')  # Isotropic kinetic energy of jet
     z = kwargs.get('z')  # Redshift
+    
+    # Energy injection parameters, Black Hole accretion scenario
+    # Injection formula L(t) = L_inj_0*T^q_inj, total injected energy E_inj=\int_{E_inj_t1}^{E_inj_t2} L(t)dt
+    E_inj_t1 = kwargs.get('E_inj_t1', 1) # Start time of energy injection in observe frame
+    E_inj_t2 = kwargs.get('E_inj_t2', 100) # End time of energy injection in observe frame
+    L_inj_0 = kwargs.get('L_inj_0', 0) # Initial injection luminosity, 0 for no energy injection
+    q_inj = kwargs.get('q_inj', 0) # Injection index
+    
+    # log-Guassian density jump in uniform environment
+    # Jump formula n(R)=dNe*(1.0+(f_jump-1)*exp(-((R-R_tr))**2/(2*f_wide**2)))
+    R_tr = kwargs.get('R_tr', 1e18) # Central position of log-Guassian profile
+    f_jump = kwargs.get('f_jump', 1) # Jumping rate, 1 for normal, in range (0,1) create a cavity, in raange (1, inf) create a dense shell
+    f_wide = kwargs.get('f_wide', 0.1) # Jump zone width rate, in logarithm
+
     
     # Openmp threads number, used in Fortran subroutine. 
     # Maximum value same as your CPU cores.
@@ -120,7 +134,7 @@ def fit(*args,**kwargs):
     
     # Flag for the method of calculating the Compton cooling factor. 
     # 1 full numerical  2 Nakar 2007  3 Fan 2003
-    index_Y = kwargs.get('index_Y', 1) 
+    index_Y = kwargs.get('index_Y', 2) 
     
     # Flag for the numerical method of calculating the Synchrotron Radiation. 
     # 1 trapezoidal O(h^2) 2 composite Simpson O(h^4)
@@ -171,7 +185,8 @@ def fit(*args,**kwargs):
     dL = cosmo.luminosity_distance(z=z).to(units.cm).value  # Luminosity distance
 
     # DO NOT CHANGE!!
-    Boundary = np.array([Eta_0, m_0, u_0, r_0, Epsilon_e, Epsilon_b, p, z, OpeningAngle_jet, theta_v, dNe, A_star, dL, E_iso, T_log10_duration, f_e, R0])
+    Boundary = np.array([Eta_0, m_0, u_0, r_0, Epsilon_e, Epsilon_b, p, z, OpeningAngle_jet, theta_v, dNe, A_star, dL, E_iso, T_log10_duration, f_e, 
+                         E_inj_t1, E_inj_t2, L_inj_0, q_inj, R_tr, f_jump, f_wide, R0])
     
     # Time serial for Observer
     Num_Tobs = 200
@@ -195,7 +210,7 @@ def fit(*args,**kwargs):
     # Calculate the electron spectrum, generating the electron energy, electron number spectrum, 
     # intrinsic synchrotron radiation luminosity, and synchrotron photon number density.
     # Uses a fully implicit scheme by default, with first-order accuracy.
-    gam_e, dN_gam_e_fs, L_syn_spec_f, seed_syn_f = Electron.fs_electron_fullhide(Boundary, R_Tobs, R_Gamma, R, V_seed, Num_gam_e, index_Y, index_syn_intger, Num_threads)
+    gam_e, dN_gam_e_fs, L_syn_spec_f, seed_syn_f, nu_m, nu_c, nu_a = Electron.fs_electron_fullhide(Boundary, R_Tobs, R_Gamma, R, V_seed, Num_gam_e, index_Y, index_syn_intger, Num_threads)
     
     # Call the WENO5 scheme for comparison 
 #    gam_e1, dN_gam_e_fs1, L_syn_spec_f1, seed_syn_f1 = Electron.fs_electron_weno5(Boundary, R_Tobs, R_Gamma, R, V_seed, Num_gam_e, index_Y, Num_threads)
