@@ -61,12 +61,15 @@ After compilation completes, run:
 ```shell
 python hand_my.py
 ```
-The program should generate the first multiband afterglow light curve image for you.
+
+If you already have the matplotlib package installed, the program should generate the first multi-band afterglow light curve image for you.
 ### Documentation
-In `mergered.py`, we have provided the basic invocation method of the program, along with simple comments for the keywords.
+In merger.py, we have provided the basic invocation method of the program, along with simple comments for the keywords.
+>>>>>>> f249313 (Update README.md)
 ### Current Status
 Due to current progress limitations, we are not yet able to provide a complete demonstration of the afterglow fitting workflow. 
 However, please start exploring and try to integrate it into your own fitting framework!
 ### Web Interface
+<<<<<<< HEAD
 We have a website available at <https://hetools.xyz>  
 that requires no installation, for comparing the results of **ASGARD** and **jetsimpy**. Feel free to give it a try!
