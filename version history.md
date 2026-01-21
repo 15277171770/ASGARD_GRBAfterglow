@@ -22,3 +22,6 @@ Speed ranking: Fan > Nakar > `dot_gam_e_ssc`; accuracy ranking is the opposite.
 **v4.0.2**  Added `dot_gam_e_ssa` module to calculate SSA-induced pile-up effects.
 **v4.0.3**  Corrected the initial mass issue in Region 2 of reverse shock dynamics (Yan), which previously lead to unphysical crossing timescales and incorrect light curve morphology. (Feedback from Yun Wang)  
 **v4.0.4**  Resolved a historical issue with the Compton Y parameter, introduced in an uncertain version, which caused underestimation of `hat_gamma_e` in the Fan method. Cumulative updates.
+**v4.1** Clean up the code directory and prepare for the release of the public version.
+**v4.2** First public version released.
+**v4.2.1** Expose energy injection interface; add density jump interface. Add synchrotron radiation characteristic frequency readout.
