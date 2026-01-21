@@ -71,6 +71,6 @@ In merger.py, we have provided the basic invocation method of the program, along
 Due to current progress limitations, we are not yet able to provide a complete demonstration of the afterglow fitting workflow. 
 However, please start exploring and try to integrate it into your own fitting framework!
 ### Web Interface
-We have a website available at  
-       <https://hetools.xyz>  
-that requires no installation, for comparing the results of ASGARD and jetsimpy. Feel free to give it a try!
+We have a website available at
+<https://hetools.xyz>  
+that requires no installation, for comparing the results of **ASGARD** and **jetsimpy**. Feel free to give it a try!
