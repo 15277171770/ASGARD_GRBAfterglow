@@ -17,7 +17,7 @@ def plot_data(axes, Tobs, flux, color, label, scaling_factor=1):
     line = axes.loglog(Tobs, flux * scaling_factor, color=color, linewidth=2.5, label=label, alpha=1)
     return line
 
-def plot_syn_lc(Tobs, Flux_optr, Flux_optz, Flux_opti, Flux_optg, Flux_9GHz, Flux_5GHz, Flux_3GHz, Flux_XRT, Flux_GeV, Flux_TeV):
+def plot_syn_lc(Tobs, Flux_XRT, Flux_optr, Flux_optz, Flux_opti, Flux_optg, Flux_9GHz, Flux_5GHz, Flux_3GHz, Flux_GeV, Flux_TeV):
 
     fig, axes = plt.subplots(figsize=(10, 8))
 
@@ -98,14 +98,14 @@ def fit(*args,**kwargs):
     z = kwargs.get('z')  # Redshift
     
     # Energy injection parameters, Black Hole accretion scenario
-    # Injection formula L(t) = L_inj_0*T^q_inj, total injected energy E_inj=\int_{E_inj_t1}^{E_inj_t2} L(t)dt
+    # Injection formula L(t) = L_inj_0*(T/E_inj_t1)^q_inj, total injected energy E_inj=\int_{E_inj_t1}^{E_inj_t2} L(t)dt
     E_inj_t1 = kwargs.get('E_inj_t1', 1) # Start time of energy injection in observe frame
     E_inj_t2 = kwargs.get('E_inj_t2', 100) # End time of energy injection in observe frame
     L_inj_0 = kwargs.get('L_inj_0', 0) # Initial injection luminosity, 0 for no energy injection
-    q_inj = kwargs.get('q_inj', 0) # Injection index
+    q_inj = kwargs.get('q_inj', -1) # Injection index
     
     # log-Guassian density jump in uniform environment
-    # Jump formula n(R)=dNe*(1.0+(f_jump-1)*exp(-((R-R_tr))**2/(2*f_wide**2)))
+    # Jump formula n(R)=dNe*(1.0+(f_jump-1)*exp(-(lg(R)-lg(R_tr))^2/(2*f_wide^2)))
     R_tr = kwargs.get('R_tr', 1e18) # Central position of log-Guassian profile
     f_jump = kwargs.get('f_jump', 1) # Jumping rate, 1 for normal, in range (0,1) create a cavity, in raange (1, inf) create a dense shell
     f_wide = kwargs.get('f_wide', 0.1) # Jump zone width rate, in logarithm
@@ -152,14 +152,19 @@ def fit(*args,**kwargs):
     
     R0 = kwargs.get('R0', 1e9)  # If you need an Uniform-to-Wind ambient medium, set this parameter as the transition radius.
     
-    '''
-    Start Calculation!
-    '''
+    Ebv = kwargs.get('Ebv', 0)
+    Rv = kwargs.get('Rv', 2.93)
+    
+    f_sys = kwargs.get('f_sys', -1)
+    
+    '''Start Calculation!'''
     
     # The observation frequencies
     # Name of the data file for fitting. It must correspond one-to-one with the files in the data_light_curve directory. 
     # Since optical data requires special processing, the filename must begin with "opt".
     band = ['xrt', 'optr', 'optz', 'opti', 'optg', '9GHz', '5.5GHz', '3GHz']
+    frequency = np.array([2.7e17, 4.63e14, 3.39e14, 4.01e14, 6.42e14, 9e9, 5.5e9, 3e9])
+    zeropointflux = [0, -48.6, -48.6, -48.6, -48.6, 0, 0, 0]
     
     # Set Calculation Frequencies
     Num_XRT = 8
@@ -176,7 +181,7 @@ def fit(*args,**kwargs):
 
     # parameters of afterglow
     
-    T_log10_duration = 8.0  # Time calculated to 1e8 seconds after triggering.
+    T_end = 8.0  # Time calculated to 10^8 seconds after triggering (rest frame).
     m_0 = 1.0e12  # Initial mass of jet shell
     u_0 = 1.0e13  # Initial internal energy of jet shell
     r_0 = 1.0e14  # Initial external-forward shock radius of jet shell
@@ -185,10 +190,10 @@ def fit(*args,**kwargs):
     dL = cosmo.luminosity_distance(z=z).to(units.cm).value  # Luminosity distance
 
     # DO NOT CHANGE!!
-    Boundary = np.array([Eta_0, m_0, u_0, r_0, Epsilon_e, Epsilon_b, p, z, OpeningAngle_jet, theta_v, dNe, A_star, dL, E_iso, T_log10_duration, f_e, 
+    Boundary = np.array([Eta_0, m_0, u_0, r_0, Epsilon_e, Epsilon_b, p, z, OpeningAngle_jet, theta_v, dNe, A_star, dL, E_iso, T_end, f_e, 
                          E_inj_t1, E_inj_t2, L_inj_0, q_inj, R_tr, f_jump, f_wide, R0])
     
-    # Time serial for Observer
+    # Time serial for Observer (observe frame)
     Num_Tobs = 200
     Tobs = np.logspace(2.0, 8.0, Num_Tobs)
     Fluxes_final = np.zeros([len(band), Num_Tobs])
@@ -208,10 +213,16 @@ def fit(*args,**kwargs):
     R_Tobs, R_Gamma, R = Dynamics.dynamics_forward(Boundary, Num_R, index_dyn)
     
     # Calculate the electron spectrum, generating the electron energy, electron number spectrum, 
-    # intrinsic synchrotron radiation luminosity, and synchrotron photon number density.
+    # intrinsic synchrotron radiation luminosity, synchrotron photon number density, 
+    # characteristic frequencies: \nu_m, \nu_c, \nu_a.
     # Uses a fully implicit scheme by default, with first-order accuracy.
     gam_e, dN_gam_e_fs, L_syn_spec_f, seed_syn_f, nu_m, nu_c, nu_a = Electron.fs_electron_fullhide(Boundary, R_Tobs, R_Gamma, R, V_seed, Num_gam_e, index_Y, index_syn_intger, Num_threads)
     
+#    plt.loglog(R_Tobs, nu_m, label='num', color='r')
+#    plt.loglog(R_Tobs, nu_c, label='nuc', color='g')
+#    plt.loglog(R_Tobs, nu_a, label='nua', color='b')
+#    plt.legend()
+
     # Call the WENO5 scheme for comparison 
 #    gam_e1, dN_gam_e_fs1, L_syn_spec_f1, seed_syn_f1 = Electron.fs_electron_weno5(Boundary, R_Tobs, R_Gamma, R, V_seed, Num_gam_e, index_Y, Num_threads)
 #    plt.loglog(gam_e,np.abs(dN_gam_e_fs[:,270]-dN_gam_e_fs1[:,270])/dN_gam_e_fs1[:,270])
@@ -219,6 +230,9 @@ def fit(*args,**kwargs):
     
     # Calculate the synchrotron self-Compton radiation, and generate the intrinsic luminosity and photon number density.
     L_SSC_spec_f,seed_ssc_f = Radiation.ssc_spec(R, gam_e, dN_gam_e_fs, V_seed, seed_syn_f, Num_threads)
+    
+    plt.loglog(V_seed,L_SSC_spec_f[:,100])
+    plt.show()
     
     L_tot = L_syn_spec_f + L_SSC_spec_f
     
@@ -228,32 +242,33 @@ def fit(*args,**kwargs):
 
     F_tot_abs = L_tot*absorption/(4.0*np.pi*dL**2)*(1.0+z)
 
-    # Calculate the equal arrival time surface effect and the Doppler effect, and output the observational results.
+    # Calculate the equal arrival time surface (EATS) effect and the Doppler effect, and output the observational results.
     # The top-hat jet uses this module, while the structured jet uses a separate module.
+    # Units in erg/cm^2/s/Hz.
     Fluxes = Interpolation.sed_interpolation(Boundary, R_Tobs, R_Gamma, R, F_tot_abs, V_seed, Frequencies, Tobs, Num_theta, Num_phi, Num_threads)
     
     # If needs EBL absorption, set it by yourself.
 #    ebl_absorption_z = Radiation.cal_ebl(z, V_obs, model="Saldana21.out")
 
-
 #    f = interp1d(V_obs, F_tot_obs.T, kind='cubic') # 
 
 #    Fluxes=f(Frequencies).T
 
-    # units in erg/cm^2/s
-    Flux_XRT = np.trapz(Fluxes[:Num_XRT].T,Frequencies[:Num_XRT])
-    
-    # units in \muJy
-    opt_fluxes = Fluxes[Num_XRT:Num_XRT+4, :] * 1e29
-    radio_fluxes = Fluxes[Num_XRT+4:Num_XRT+7, :] * 1e29
-    
-    # units in erg/cm^2/s
-    GeV_fluxes = Fluxes[Num_XRT+7, :] * GeV_Frequency
-    TeV_fluxes = Fluxes[Num_XRT+8, :] * TeV_Frequency
+    reshape_vec = lambda arr: arr.reshape(1, -1) if arr.ndim == 1 else arr
+
+    Fluxes_final = np.vstack([
+        reshape_vec(np.trapz(Fluxes[:Num_XRT].T, Frequencies[:Num_XRT], axis=1)), # units in erg/cm^2/s
+        Fluxes[Num_XRT:Num_XRT+4] * 1e29, # units convert to \muJy
+        Fluxes[Num_XRT+4:Num_XRT+7] * 1e29,  # units convert to \muJy
+        reshape_vec(Fluxes[Num_XRT+7] * GeV_Frequency),  # units in erg/cm^2/s
+        reshape_vec(Fluxes[Num_XRT+8] * TeV_Frequency)  # units in erg/cm^2/s
+    ])
     
     if plot_LC:
-        plot_syn_lc(Tobs, *opt_fluxes, *radio_fluxes, Flux_XRT, GeV_fluxes, TeV_fluxes)
+        plot_syn_lc(Tobs, *Fluxes_final)
 
+    redchi_fin = chilc(band, Fluxes_final, Tobs, frequency, Rv, Ebv, zeropointflux, z, f_sys)
+    
     gc.collect()
     
-    return 0
+    return redchi_fin

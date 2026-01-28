@@ -3,8 +3,8 @@ import numpy as np
 
 E_iso = 10 ** 53
 Eta_0 = 10 ** 2
-n_0 = 10 ** -2
-A_star = -1
+n_0 = 10 ** -20
+A_star = 1
 theta_j = 10 ** -1
 theta_v = 0 * theta_j
 p = 2.2

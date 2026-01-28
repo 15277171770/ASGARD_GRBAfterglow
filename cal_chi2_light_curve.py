@@ -6,16 +6,16 @@ import warnings
 from extinc import opt_extinction
 
 def cal_chi2_light_curve(bands_fit, model_curves, model_serial, frequency, 
-                        Rv, Ebv, zeropointflux, f_sys):
+                        Rv, Ebv, zeropointflux, z, f_sys):
 
     data_dir = Path(__file__).parent / "data_light_curve"
     
     if not data_dir.exists():
-        raise FileNotFoundError(f"数据目录不存在: {data_dir}")
+        raise FileNotFoundError(f"Data directory does not exist: {data_dir}")
     
     chi2_total = 0.0
     
-    # 预创建插值器（避免在循环中重复创建）
+    # Pre-create interpolator (to avoid repeatedly creating in the loop)
     model_interpolators = []
     for i in range(len(bands_fit)):
         interp = interpolate.interp1d(model_serial, model_curves[i, :], 
@@ -51,7 +51,7 @@ def cal_chi2_light_curve(bands_fit, model_curves, model_serial, frequency,
             
             fit_flux = model_interpolators[band_idx](range_data)
             if np.any(np.isnan(fit_flux)):
-                raise ValueError("部分数据点超出模型范围")
+                raise ValueError("Some data points are beyond the scope of the model.")
             
             sigma = _get_uncertainties(flux_data, flux_err, fit_flux, table.shape[1])
             variance = _calculate_variance(flux_data, sigma, f_sys)
@@ -60,13 +60,13 @@ def cal_chi2_light_curve(bands_fit, model_curves, model_serial, frequency,
             chi2_total += temp_chi2
             
         except Exception as e:
-            warnings.warn(f"处理文件 {data_file.name} 时出错: {str(e)}")
+            warnings.warn(f"An error occurred while processing the file {data_file.name}: {str(e)}")
             continue
     
     return chi2_total
 
 def _parse_observation_data(table, name):
-    """解析观测数据格式"""
+    """Analyze the format of observational data"""
     n_cols = table.shape[1] if table.ndim > 1 else table.size
     
     if n_cols == 6:
@@ -82,25 +82,23 @@ def _parse_observation_data(table, name):
         range_data, flux_data = table[:, 0], table[:, 1]
         flux_err = flux_data * 0.1
     else:
-        raise ValueError(f'观测数据应为2-6列，当前为{n_cols}列')
+        raise ValueError(f'The observation data should be 2 to 6 columns. Currently, there are {n_cols} columns.')
     
     return range_data, flux_data, flux_err
 
 def _convert_time_units(range_data, name):
-    """转换时间单位"""
-    return range_data if name.endswith('keV') else range_data * 86400
+    """Convert time units"""
+    return range_data if name.endswith('keV') or name.endswith('xrt') or name.endswith('XRT') else range_data * 86400
 
 def _validate_model_range(range_data, model_serial):
-    """验证模型范围是否覆盖数据"""
+    """Verify whether the model scope covers the data"""
     if np.min(range_data) < model_serial[0] or np.max(range_data) > model_serial[-1]:
-        raise ValueError('模型曲线不能完全覆盖数据范围')
+        raise ValueError('The model curve cannot fully cover the data range.')
 
 def _get_uncertainties(flux_data, flux_err, fit_flux, n_cols):
-    """获取不确定性估计"""
     return np.where(fit_flux > flux_data, flux_err, -flux_err) if n_cols == 6 else flux_err
 
 def _calculate_variance(flux_data, sigma, f_sys):
-    """计算方差"""
     return (flux_data * 0.1)**2 if f_sys <= 0 else (flux_data * f_sys)**2 + sigma**2
     
     

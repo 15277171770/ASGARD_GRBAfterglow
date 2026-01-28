@@ -98,7 +98,7 @@ SUBROUTINE F(T, Y, M, D, E_e, E_iso, Eta_0, dNe_ISM, A_star, E_b, p, z, f_e, &
     t_1=E_inj_t1/(one+z)
     t_2=E_inj_t2/(one+z)
     if (T >= t_1 .and. T<= t_2) then
-        A=E_inj
+        A=E_inj*(T/t_1)**E_inj_q
     else
         A=zero
     end if
@@ -159,13 +159,13 @@ SUBROUTINE F(T, Y, M, D, E_e, E_iso, Eta_0, dNe_ISM, A_star, E_b, p, z, f_e, &
     D01=Y(1)**2-one
     dM=4d0*pi*dNe*Y(4)**2*D00*Para_m_p
     D011=-dM/D00*Para_c**2*Y(1)*D01*(hat_gam*Y(1)-hat_gam+one)- &
-            (hat_gam*D01+one)*Y(1)*(one-hat_gam)*3d0*Y(3)/Y(4)+Y(1)**2*A*T**E_inj_q/D00
+            (hat_gam*D01+one)*Y(1)*(one-hat_gam)*3d0*Y(3)/Y(4)+Y(1)**2*A/D00
     D022=Y(1)**2*(DNe0+Y(2))*Para_c**2+(hat_gam**2*D01+3d0*hat_gam-two)*Y(3)
 
     D(1)=D011/D022*D00
     D(2)=dM
     D(3)=((1d0-Epe)*(Y(1)-one)*dM/D00*Para_c**2-                &
-            (hat_gam-one)*(3d0/Y(4)-one/Y(1)*D(1)/D00)*Y(3))*D00+A*T**E_inj_q/D00
+            (hat_gam-one)*(3d0/Y(4)-one/Y(1)*D(1)/D00)*Y(3))*D00+A/D00
     D(4)=D00
     end select
     
