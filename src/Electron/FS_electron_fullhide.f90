@@ -129,7 +129,7 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
         Gam_e_max=3d0*Para_m_energy/dsqrt(8d0*DB*Para_e**3)
         Gam_e_m=(p-two)/(p-one)*Epsilon_e*1836d0*(R_Gamma_loc-one)/f_e+one
         if (p<2.05 .and. p>=2.0) then
-            Gam_e_m=0.05d0/1.05d0*Epsilon_e*1836d0*(R_Gamma_loc-one)/f_e+one
+            Gam_e_m=(p-two)/(p-one)*Epsilon_e*1836d0*(R_Gamma_loc-one)/f_e+one
         else if (p<2 .and. p>1) then
             Gam_e_m=((two-p)/(p-one)*Epsilon_e/f_e*1836d0*(R_Gamma_loc-one)*Gam_e_max**(p-two))**(one/(p-one))+one
         end if
@@ -141,7 +141,7 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
         dDR=0.1/(f_r*Gam_e_max+1.333/(R(I_tobs)+R(I_tobs-1)))
         !***********************[Here we have presented the choice on Delta_r]******************************************
         dDD=R(I_tobs)-R(I_tobs-1)
-        L1=max(100,min(1000,Int(dDD/dDR)))
+        L1=max(10,min(10,Int(dDD/dDR)))
         dDR=dDD/L1
         CFL=dDR/d_x
         dN_x=dN_gam_e(:,I_tobs-1)*gam_e*dlog(ten)

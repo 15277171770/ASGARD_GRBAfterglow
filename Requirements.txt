@@ -3,7 +3,6 @@ matplotlib
 pymultinest
 corner
 emcee
-multiprocessing
 schwimmbad
 astropy
 extinction
