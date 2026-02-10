@@ -1,9 +1,10 @@
-!Calculate the electron distibutions of forward shock.
-!New improvement at 11.29.2022
+!Calculate the electron distributions of forward shock.
+!Modified to use Implicit Three-Level Method (second-order time accuracy)
+!Modified at 2024 by AI assistant based on original code from 11.29.2022
 !****************************************************************************************
 !******************************* main program *******************************************
 !****************************************************************************************
-subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,Num_gam_e,index_Y,index_syn_intger,n_threads, &
+subroutine fs_electron_t2g1(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,Num_gam_e,index_Y,index_syn_intger,n_threads, &
                                 gam_e,dN_gam_e,P_syn,Seed_syn,V_m,V_c,V_a)
     !$ use omp_lib
     use constants
@@ -14,11 +15,12 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
     real(8), intent(out) :: dN_gam_e(Num_gam_e,Num_R),gam_e(Num_gam_e),P_syn(Num_nu,Num_R), &
                             Seed_syn(Num_nu,Num_R), V_m(Num_R), V_c(Num_R), V_a(Num_R)
     
-    real(8),allocatable,dimension (:) :: dEl,dEL_mean,principal,x,dF1,up,dot_gam_e_SSA, &
-                                         dN_x,temp1,temp2,temp3,temp4,para_maxwell,Compton,Compton1,dot_gam_e
+    real(8),allocatable,dimension (:) :: dEl,dEL_mean,principal,x,dF1,up,para_minus_gam_e_p,dot_gam_e_SSA, &
+                                         dN_x,dN_x_prev,temp1,temp2,temp3,temp4,para_maxwell,Compton,Compton1,dot_gam_e
     allocate (dEl(Num_gam_e),dEL_mean(Num_gam_e-1),principal(Num_gam_e),x(Num_gam_e),dF1(Num_gam_e), &
-              up(Num_gam_e-1),dN_x(Num_gam_e),temp1(Num_gam_e-1),temp2(Num_gam_e),para_maxwell(Num_gam_e), &
-              temp3(Num_gam_e-1),temp4(Num_gam_e-1),Compton(Num_gam_e),dot_gam_e_SSA(Num_gam_e),Compton1(Num_gam_e))
+              up(Num_gam_e-1),dN_x(Num_gam_e),dN_x_prev(Num_gam_e),temp1(Num_gam_e-1), &
+              temp2(Num_gam_e),para_maxwell(Num_gam_e),temp3(Num_gam_e-1),temp4(Num_gam_e-1), &
+              para_minus_gam_e_p(Num_gam_e),Compton(Num_gam_e),dot_gam_e(Num_gam_e),dot_gam_e_SSA(Num_gam_e),Compton1(Num_gam_e))
     
     !***********************[Parameter Initial]**********************
     Eta_0=Boundary(1)
@@ -43,7 +45,7 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
     V_c=zero
     V_a=zero
 
-    !*****************Part 1: given the boundary consition [Using the analytical approximation]*********************
+    !*****************Part 1: given the boundary condition [Using the analytical approximation]*********************
     if (A_star > zero) then
         dNe_wind=A_star*3.0d35/R(1)**2
         Para_N_e_ini=4d0*pi*R_ini*A_star*3.0d35
@@ -67,24 +69,11 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
     DB_min=0.39d0*dsqrt(Epsilon_b*dNe*(R_Gamma(Num_R)*(R_Gamma(Num_R)-one)))
     Gam_e_max_max=3d0*Para_m_energy/dsqrt(8d0*DB_min*Para_e**3)
     Gam_e_m=(p-two)/(p-one)*Epsilon_e/f_e*1836d0*(R_Gamma(1)-one)+one
-    temp_gam=Epsilon_e/f_e*para_m_p/para_m_e*(R_Gamma(1)-one)
-        if (p>2d0) then
-            Gam_e_m=(p-two)/(p-one)*temp_gam+one
-        else if (p<2d0 .and. p>1d0) then
-            Gam_e_m=((two-p)/(p-one)*temp_gam*Gam_e_max**(p-two))**(one/(p-one))+one
-        else if (p==2d0) then
-            eps=1d-5
-            Gam_e_m=one
-            temp=temp_gam/log(Gam_e_max/Gam_e_m)
-            do while (abs(one-Gam_e_m/temp)>eps)
-                temp=temp_gam/log(Gam_e_max/Gam_e_m)
-                if (Gam_e_m>temp) then
-                    Gam_e_m=0.5d0*(Gam_e_m+temp)
-                else
-                    Gam_e_m=0.5d0*(Gam_e_m+Gam_e_max)
-                end if
-            end do
-        end if
+    if (p<2.01 .and. p>=2.0) then
+        Gam_e_m=0.01d0/1.01d0*Epsilon_e/f_e*1836d0*(R_Gamma(1)-one)+one
+    else if (p<2 .and. p>1) then
+        Gam_e_m=((two-p)/(p-one)*Epsilon_e/f_e*1836d0*(R_Gamma(1)-one)*Gam_e_max**(p-two))**(one/(p-one))+one
+    end if
     Gam_e_c=7.7d8/(one+dsqrt(Epsilon_e/Epsilon_b))/R_Gamma(1)/DB**2/(R_Tobs(1)/two)
     do I_gam_e=1,Num_gam_e
         Gam_e(I_gam_e)=3d0*ten**(dlog10(Gam_e_max_max)*(I_gam_e-1)/(Num_gam_e-1))
@@ -115,9 +104,12 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
     !*******************Part 1 is completed [has been checked and there is no bug]**********************************
     !*******************Part 2: To calculate the electron distribution**********************************************
     dN_x=dN_gam_e(:,1)*gam_e*dlog(ten)
+    dN_x_prev = dN_x
     d_x=dlog10(gam_e(2)/gam_e(1))
-!    factor_adv=Para_sigmaT/(6.0d0*pi*Para_m_energy)
+    para_minus_gam_e_p=one/(gam_e-one)**p*gam_e*dlog(ten)
 
+    ! For the first few steps, we need to use single-step methods
+    ! We'll use a startup procedure
     do I_tobs=2,Num_R
         R_loc=R(I_tobs-1)
         R_Gamma_loc=(R_Gamma(I_tobs)+R_Gamma(I_tobs-1))/two
@@ -129,8 +121,7 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
                 dNe=dNe_wind
             end if
         else
-            !dNe=dNe_ISM
-            dNe=dNe_ISM*(1d0+(f_jump-1d0)*exp(-(log10(R_loc)-log10(R_tr))**2/(2d0*f_wide*f_wide)))
+            dNe=dNe_ISM
         end if
         
         if (R_loc<R0) then
@@ -139,25 +130,13 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
 
         DB=0.39d0*dsqrt(Epsilon_b*dNe*(R_Gamma_loc*(R_Gamma_loc-one)))
         Gam_e_max=3d0*Para_m_energy/dsqrt(8d0*DB*Para_e**3)
-        temp_gam=Epsilon_e/f_e*para_m_p/para_m_e*(R_Gamma_loc-one)
-        if (p>2d0) then
-            Gam_e_m=(p-two)/(p-one)*temp_gam+one
-        else if (p<2d0 .and. p>1d0) then
-            Gam_e_m=((two-p)/(p-one)*temp_gam*Gam_e_max**(p-two))**(one/(p-one))+one
-        else if (p==2d0) then
-            eps=1d-5
-            Gam_e_m=one
-            temp=temp_gam/log(Gam_e_max/Gam_e_m)
-            do while (abs(one-Gam_e_m/temp)>eps)
-                temp=temp_gam/log(Gam_e_max/Gam_e_m)
-                if (Gam_e_m>temp) then
-                    Gam_e_m=0.5d0*(Gam_e_m+temp)
-                else
-                    Gam_e_m=0.5d0*(Gam_e_m+Gam_e_max)
-                end if
-            end do
+        Gam_e_m=(p-two)/(p-one)*Epsilon_e*1836d0*(R_Gamma_loc-one)/f_e+one
+        if (p<2.05 .and. p>=2.0) then
+            Gam_e_m=0.05d0/1.05d0*Epsilon_e*1836d0*(R_Gamma_loc-one)/f_e+one
+        else if (p<2 .and. p>1) then
+            Gam_e_m=((two-p)/(p-one)*Epsilon_e/f_e*1836d0*(R_Gamma_loc-one)*Gam_e_max**(p-two))**(one/(p-one))+one
         end if
-        Gam_e_m_p=(one-p)/(Gam_e_max**(one-p)-Gam_e_m**(one-p))
+        Gam_e_m_p=(p-one)*(Gam_e_m-one)**(p-one)
         Gam_e_c=7.7d8*(one+z)/R_Gamma_loc/DB**2/R_Tobs(I_tobs)
 
         beta_Gam=sqrt(one-one/R_Gamma_loc**2)
@@ -165,19 +144,21 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
         dDR=0.1/(f_r*Gam_e_max+1.333/(R(I_tobs)+R(I_tobs-1)))
         !***********************[Here we have presented the choice on Delta_r]******************************************
         dDD=R(I_tobs)-R(I_tobs-1)
-        L1=max(100,min(1000,Int(dDD/dDR)))
+        L1=max(10,min(10,Int(dDD/dDR)))
         dDR=dDD/L1
         CFL=dDR/d_x
-        dN_x=dN_gam_e(:,I_tobs-1)*gam_e*dlog(ten)
+        ! For the first step of each I_tobs, we use the solution from previous step
+        if (I_tobs == 2) then
+            dN_x=dN_gam_e(:,1)*gam_e*dlog(ten)
+            dN_x_prev = dN_x
+        else
+            dN_x=dN_x  ! Keep the solution from previous I_tobs
+        end if
         
         V_m(I_tobs-1)=4.2d6*DB*Gam_e_m*Gam_e_m/(R_Gamma_loc*(1d0-beta_Gam)*(one+z))
         V_c(I_tobs-1)=4.2d6*DB*Gam_e_c*Gam_e_c/(R_Gamma_loc*(1d0-beta_Gam)*(one+z))
         call get_nu_a(R_loc,DB,Num_gam_e,gam_e,dN_gam_e(:,I_tobs-1), temp)
         V_a(I_tobs-1)=temp/(R_Gamma_loc*(1d0-beta_Gam)*(one+z))
-
-        !Compton_max=one+(-one+dsqrt(one+4d0*eta*Epsilon_e/Epsilon_b))/two
-        !Gam_e_max=Gam_e_max!/sqrt(Compton_max)
-!        Compton = zero
 
         select case(index_syn_intger)
         
@@ -224,18 +205,9 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
          
         end select
          
-!        four_v=R_Gamma_loc*beta_Gam
-!        theta=four_v/3d0*(four_v+1.07*four_v*four_v)/(one+four_v+1.07*four_v*four_v)
-!        theta=max(theta,2d-1)
-!        para_maxwell=gam_e*gam_e*dsqrt(one-one/gam_e**2)/theta/besselk(1d0/theta)* &
-!                     dexp(-gam_e/theta)
-!        para_normalize=sum((para_maxwell(2:Num_gam_e)+para_maxwell(1:Num_gam_e-1))* &
-!                       (gam_e(2:Num_gam_e)-gam_e(1:Num_gam_e-1)))/two
-!        para_maxwell=para_maxwell/para_normalize*gam_e*dlog(ten)
-
-
         dEL_mean=(dEl(2:Num_gam_e)+dEl(1:Num_gam_e-1))/two/dlog(ten)
 
+        ! Main loop for sub-steps
         do L=1,L1
             R_loc=R_loc+dDR
             
@@ -247,31 +219,38 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
                     dNe=dNe_wind
                 end if
             else
-            !    dNe=dNe_ISM
-                dNe=dNe_ISM*(1d0+(f_jump-1d0)*exp(-(log10(R_loc)-log10(R_tr))**2/(2d0*f_wide*f_wide)))
+                dNe=dNe_ISM*(1.0+(f_jump-1d0)*exp(-(log10(R_loc)-log10(R_tr))**2/(2*f_wide*f_wide)))
             end if
-
+        
             if (R_loc<R0) then
                 dNe=A_star*3.0d35/R0**2
             end if
             
-            Q=4d0/3d0*pi*(3d0*R_loc**2+dDR*(3d0*R_loc+dDR))*dNe*f_e*Gam_e_m_p
+            Q=4d0/3d0*pi*(3d0*R_loc**2+dDR*(3d0*R_loc+dDR))*dNe*f_e*Gam_e_m_p  !here Q is Q_0*\gamma_m**p
             dF1=zero
-            where(gam_e<Gam_e_max .and. gam_e>Gam_e_m) dF1=Q*gam_e**(-p)*gam_e*log(ten)
-!            dF1=dF1+Q*para_maxwell/Gam_e_m_p*(one-f_e)
+            where(gam_e<Gam_e_max .and. gam_e>Gam_e_m) dF1=Q*para_minus_gam_e_p
 
             temp3=dEL_mean+one/R_loc/dlog(ten)
-            up=-CFL*temp3 !up
-            principal(2:Num_gam_e)=one-up !main
-            principal(1)=principal(2)
+            up=-CFL*temp3
+            
+            if (I_tobs == 2 .and. L <= 2) then
+                principal(2:Num_gam_e) = one - up
+                principal(1) = principal(2)
+                temp2 = (dN_x + dDR * dF1) / principal
+            else
+                principal(2:Num_gam_e) = 1.5d0 - up
+                principal(1) = principal(2)
+                temp2 = ( (2d0)*dN_x - 0.5d0*dN_x_prev + dF1 * dDR ) / principal
+            end if
 
             temp1=up/(principal(2:Num_gam_e)+principal(1:Num_gam_e-1))*two
-            temp2=(dN_x+dDR*dF1)/principal
             x(Num_gam_e)=temp2(Num_gam_e)
             do i=Num_gam_e-1,1,-1
                 x(i)=max(zero, temp2(i)-temp1(i)*x(i+1))
             end do
-            dN_x=x
+            
+            dN_x_prev = dN_x
+            dN_x = x
 
             if (L1 == L) then
                 dN_gam_e(:,I_tobs)=dN_x/gam_e/dlog(ten)
@@ -279,8 +258,8 @@ subroutine fs_electron_fullhide(Boundary,R_Tobs,R_Gamma,R,V_seed,n,Num_nu,Num_R,
         end do
     end do
 
-    deallocate (dEl,dEL_mean,principal,x,dF1,up,dN_x,temp1,temp2,para_maxwell,temp3,temp4,Compton,Compton1)
+    deallocate (dEl,dEL_mean,principal,x,dF1,up,dN_x,dN_x_prev,temp1,temp2,para_maxwell, &
+                temp3,temp4,para_minus_gam_e_p,Compton,Compton1)
 
     return
-end subroutine fs_electron_fullhide
-
+end subroutine fs_electron_t2g1

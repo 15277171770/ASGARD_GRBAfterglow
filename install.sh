@@ -19,8 +19,9 @@ FFLAGS="$F90FLAGS_COMMON" $F2PY_CMD -m Dynamics_forward -c ../Constants.f90 Dyna
 
 cd ../Electron
 rm -f *.so *.mod *.o
-FFLAGS="$F90FLAGS_OMP" $F2PY_CMD -m FS_electron_weno5 -c ../Constants.f90 FS_electron_weno5.f90 $LIBS --quiet
+FFLAGS="$F90FLAGS_OMP" $F2PY_CMD -m FS_electron_weno5 -c ../Constants.f90 calling_modules.f90 FS_electron_weno5.f90 $LIBS --quiet
 FFLAGS="$F90FLAGS_OMP" $F2PY_CMD -m FS_electron_fullhide -c ../Constants.f90 calling_modules.f90 FS_electron_fullhide.f90 $LIBS --quiet
+FFLAGS="$F90FLAGS_OMP" $F2PY_CMD -m FS_electron_t2g1 -c ../Constants.f90 calling_modules.f90 FS_electron_t2g1.f90 $LIBS --quiet
 
 cd ../Interpolation
 rm -f *.so *.mod *.o

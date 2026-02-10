@@ -60,7 +60,7 @@ subroutine sed_interpolation(Boundary,R_Tobs1,R_gamma,R,F_tot,V_seed,V_obs,Tobs,
 
                    doppler=DG*(one-Beta*DMu) !Doppler factor, changed with R
                    V_seed_temp(:,I_Theta)=log(V_seed/(doppler*(one+z))) !For frequency that has decayed with D, and shifted with (1+z)
-                   F_tot_temp(:,I_Theta)=max(-399d0,DP(:,I_Theta)+log(domega)-log(4.0*pi)-3d0*log(doppler)) !For flux that has decayed with D^3
+                   F_tot_temp(:,I_Theta)=max(-199d0,DP(:,I_Theta)+log(domega)-log(4.0*pi)-3d0*log(doppler)) !For flux that has decayed with D^3
 
                    do i_nu1=1,Num_nu_obs
                       do i_nu2=1,Num_nu-1

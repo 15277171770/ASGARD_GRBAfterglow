@@ -3,11 +3,11 @@ import numpy as np
 
 E_iso = 10 ** 53
 Eta_0 = 10 ** 2
-n_0 = 10 ** -20
-A_star = 1
+n_0 = 10 ** -1
+A_star = -1
 theta_j = 10 ** -1
 theta_v = 0 * theta_j
-p = 2.2
+p = 2.5
 Epsilon_e = 10 ** -1
 Epsilon_b = 10 ** -3
 f_e = 10 ** -1
@@ -20,8 +20,8 @@ params={
         'index_Y': 2,            #   1: full numerical       2: Nakar                      3: Fan
         'index_syn_intger': 2,   #   1: trapezoidal O(h^2)   2: composite Simpson O(h^4)
         
-        'Num_gam_e': 101,
-        'Num_nu': 101,
+        'Num_gam_e': 201,
+        'Num_nu': 201,
         'Num_R': 300,
         'Num_theta': 300,
         'Num_phi': 1,

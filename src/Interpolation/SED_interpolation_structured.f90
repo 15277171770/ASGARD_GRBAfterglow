@@ -19,9 +19,9 @@ subroutine sed_interpolation_structured(Boundary, angle_narrow_jet, R_Tobs1,R_ga
     real(8), intent(out) :: P_tot_obs(Num_nu_obs,Num_Tobs)
     
     
-    allocatable :: R_Tobs(:,:),DP(:,:),V_seed_temp(:,:),P_tot_temp(:,:),P_tot_obs_temp(:,:)
+    allocatable :: R_Tobs(:,:),DP(:,:),V_seed_temp(:,:),P_tot_temp(:,:),P_tot_obs_temp(:,:),V_obs_log(:)
     allocate (R_Tobs(Num_R,Num_Theta),DP(Num_nu,Num_Theta),V_seed_temp(Num_nu,Num_Theta), &
-              P_tot_temp(Num_nu,Num_Theta),P_tot_obs_temp(Num_nu_obs,Num_Tobs))
+              P_tot_temp(Num_nu,Num_Theta),P_tot_obs_temp(Num_nu_obs,Num_Tobs),V_obs_log(Num_nu))
     
     
     V_seed_temp=zero
@@ -42,7 +42,8 @@ subroutine sed_interpolation_structured(Boundary, angle_narrow_jet, R_Tobs1,R_ga
         dPhi=pi/1440d0
     end if
     dtheta=OpeningAngle_jet/Num_Theta
-
+    V_obs_log = log(V_obs)
+    
     !$OMP PARALLEL num_threads(n_threads),reduction(+:P_tot_obs_temp)
     !$OMP DO SIMD
     do I_Theta=1,Num_Theta
@@ -50,8 +51,8 @@ subroutine sed_interpolation_structured(Boundary, angle_narrow_jet, R_Tobs1,R_ga
        if (angle_narrow_jet>Taa) cycle
        domega=dsin(Taa)*dtheta*dPhi
        do i_Phi=1,Num_Phi
-          Phi=i_Phi*dPhi
-          DMu=dcos(Tv)*dcos(Taa)+dsin(Tv)*dsin(Taa)*dcos(Phi)
+          Phi_center=(i_Phi-0.5)*dPhi
+          DMu=dcos(Tv)*dcos(Taa_center)+dsin(Tv)*dsin(Taa_center)*dcos(Phi_center)
           R_Tobs(:,I_Theta)=R_Tobs1(:,I_Theta)+R(:,I_Theta)*(one-DMu)*(one+z)/Para_c       
           do K1=1,Num_Tobs
              II=1
@@ -59,27 +60,25 @@ subroutine sed_interpolation_structured(Boundary, angle_narrow_jet, R_Tobs1,R_ga
              do K2=II,Num_R-1
                 if ((Tobs(K1) >= R_Tobs(K2,I_Theta)).and.(Tobs(K1) < R_Tobs(K2+1,I_Theta))) then
                    Ratio=(Tobs(K1)-R_Tobs(K2,I_Theta))/(R_Tobs(K2+1,I_Theta)-R_Tobs(K2,I_Theta))
-                   DG=R_gamma(K2,I_Theta)+Ratio*(R_gamma(K2+1,I_Theta)-R_gamma(K2,I_Theta))
+                   DG=exp(log(R_gamma(K2,I_Theta))+Ratio*(log(R_gamma(K2+1,I_Theta))-log(R_gamma(K2,I_Theta))))
                    DR=R(K2,I_Theta)+Ratio*(R(K2+1,I_Theta)-R(K2,I_Theta))
-                   DP(:,I_Theta)=P_tot(:,K2,I_Theta)+Ratio*(P_tot(:,K2+1,I_Theta)-P_tot(:,K2,I_Theta))
+                   DP(:,I_Theta)=log(P_tot(:,K2,I_Theta))+Ratio*(log(P_tot(:,K2+1,I_Theta))-log(P_tot(:,K2,I_Theta)))
                    !linear interpolation to get the intrinsic SED at EATS.
                    Beta=dsqrt(one-DG**(-2))
 
                    doppler=DG*(one-Beta*DMu) !Doppler factor, changed with R
-                   doppler3=doppler*doppler*doppler
-                   V_seed_temp(:,I_Theta)=V_seed/(doppler*(one+z)) !For frequency that has decayed with D, and shifted with (1+z)
-                   P_tot_temp(:,I_Theta)=DP(:,I_Theta)*domega/(4.0*pi*doppler3)
-                   !For flux that has decayed with D^3
-
+                   V_seed_temp(:,I_Theta)=log(V_seed/(doppler*(one+z))) !For frequency that has decayed with D, and shifted with (1+z)
+                   P_tot_temp(:,I_Theta)=max(-199d0,DP(:,I_Theta)+log(domega)-log(4.0*pi)-3d0*log(doppler)) !For flux that has decayed with D^3
+                   
                    do i_nu1=1,Num_nu_obs
                       do i_nu2=1,Num_nu-1
-                         if (V_obs(i_nu1) > V_seed_temp(i_nu2,I_Theta) .and. &
-                             V_obs(i_nu1) <= V_seed_temp(i_nu2+1,I_Theta)) then
-                             Ratio=(V_obs(i_nu1)-V_seed_temp(i_nu2,I_Theta))/ &
+                         if (V_obs_log(i_nu1) > V_seed_temp(i_nu2,I_Theta) .and. &
+                             V_obs_log(i_nu1) <= V_seed_temp(i_nu2+1,I_Theta)) then
+                             Ratio=(V_obs_log(i_nu1)-V_seed_temp(i_nu2,I_Theta))/ &
                                    (V_seed_temp(i_nu2+1,I_Theta)-V_seed_temp(i_nu2,I_Theta))
-                             P_tot_obs_temp(i_nu1,K1)=P_tot_obs_temp(i_nu1,K1)+P_tot_temp(i_nu2,I_Theta)+ &
-                                                   Ratio*(P_tot_temp(i_nu2+1,I_Theta)-P_tot_temp(i_nu2,I_Theta))
-                             !another linear interpolation from the Doppler boosted freqency to the observed frequency
+                             P_tot_obs_temp(i_nu1,K1)=P_tot_obs_temp(i_nu1,K1)+exp(P_tot_temp(i_nu2,I_Theta)+ &
+                                                   Ratio*(P_tot_temp(i_nu2+1,I_Theta)-P_tot_temp(i_nu2,I_Theta)))
+                             !another logarithm interpolation from the Doppler boosted freqency to the observed frequency
                          end if
                       end do
                    end do

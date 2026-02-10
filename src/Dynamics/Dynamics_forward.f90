@@ -107,7 +107,7 @@ SUBROUTINE F(T, Y, M, D, E_e, E_iso, Eta_0, dNe_ISM, A_star, E_b, p, z, f_e, &
     dB=0.39d0*dsqrt((E_b*dNe)*(Y(1)**2-one))
     gam_c=7.739d8/(dB**2*Y(1)*T)
     gam_m=Epe/f_e*1836d0*(p-two)*(Y(1)-one)/(p-one)+one
-    if ((gam_c-gam_m) > 0.001) Epe=Epe*(gam_m/gam_c)**(p-two)
+    if ((gam_c-gam_m) > 0.001 .and. p>=2) Epe=Epe*(gam_m/gam_c)**(p-two)
     Bgam=dsqrt(one-one/Y(1)**2)
 
     select case(index_dyn)
